@@ -4,16 +4,20 @@ import os
 
 app = Flask(__name__)
 
-DB_NAME = "data.db"
+# ✅ ABSOLUTE DB PATH (Render-safe)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "data.db")
 
 def get_db():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
+# ✅ Initialize DB on app start (VERY IMPORTANT for Render)
 def init_db():
     conn = get_db()
-    conn.execute("""
+    cur = conn.cursor()
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL
@@ -22,10 +26,11 @@ def init_db():
     conn.commit()
     conn.close()
 
+# 🔥 Run immediately when app loads
+init_db()
+
 @app.route("/", methods=["GET", "POST"])
 def home():
-    init_db()   # 🔥 THIS is the key line
-
     conn = get_db()
     cur = conn.cursor()
 
@@ -33,6 +38,7 @@ def home():
         name = request.form["name"]
         cur.execute("INSERT INTO users (name) VALUES (?)", (name,))
         conn.commit()
+        conn.close()
         return redirect("/")
 
     cur.execute("SELECT * FROM users")
@@ -58,5 +64,4 @@ def update(id):
     return redirect("/")
 
 if __name__ == "__main__":
-    init_db()
-    app.run(host="0.0.0.0", port=5000)
+    app.run(debug=True)
