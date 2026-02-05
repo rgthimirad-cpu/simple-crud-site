@@ -4,8 +4,9 @@ import os
 
 app = Flask(__name__)
 
-# ✅ ABSOLUTE DB PATH (Render-safe)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# ✅ Render persistent disk
+BASE_DIR = "/var/data"
+os.makedirs(BASE_DIR, exist_ok=True)
 DB_PATH = os.path.join(BASE_DIR, "data.db")
 
 def get_db():
@@ -13,8 +14,7 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-# ✅ Initialize DB on app start (VERY IMPORTANT for Render)
-def init_db():
+def ensure_table():
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""
@@ -26,11 +26,13 @@ def init_db():
     conn.commit()
     conn.close()
 
-# 🔥 Run immediately when app loads
-init_db()
+# ✅ RUN ON IMPORT (Flask 3 compatible)
+ensure_table()
 
 @app.route("/", methods=["GET", "POST"])
 def home():
+    ensure_table()  # 🔥 GUARANTEE table exists
+
     conn = get_db()
     cur = conn.cursor()
 
@@ -38,7 +40,6 @@ def home():
         name = request.form["name"]
         cur.execute("INSERT INTO users (name) VALUES (?)", (name,))
         conn.commit()
-        conn.close()
         return redirect("/")
 
     cur.execute("SELECT * FROM users")
@@ -48,6 +49,7 @@ def home():
 
 @app.route("/delete/<int:id>")
 def delete(id):
+    ensure_table()
     conn = get_db()
     conn.execute("DELETE FROM users WHERE id = ?", (id,))
     conn.commit()
@@ -56,6 +58,7 @@ def delete(id):
 
 @app.route("/update/<int:id>", methods=["POST"])
 def update(id):
+    ensure_table()
     name = request.form["name"]
     conn = get_db()
     conn.execute("UPDATE users SET name = ? WHERE id = ?", (name, id))
@@ -64,4 +67,4 @@ def update(id):
     return redirect("/")
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
