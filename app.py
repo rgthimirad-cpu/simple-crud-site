@@ -4,9 +4,8 @@ import os
 
 app = Flask(__name__)
 
-# ✅ Render persistent disk
-BASE_DIR = "/var/data"
-os.makedirs(BASE_DIR, exist_ok=True)
+# Always use absolute path (VERY IMPORTANT for Render)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "data.db")
 
 def get_db():
@@ -16,8 +15,7 @@ def get_db():
 
 def ensure_table():
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL
@@ -26,12 +24,10 @@ def ensure_table():
     conn.commit()
     conn.close()
 
-# ✅ RUN ON IMPORT (Flask 3 compatible)
-ensure_table()
-
 @app.route("/", methods=["GET", "POST"])
 def home():
-    ensure_table()  # 🔥 GUARANTEE table exists
+    # 🔥 ENSURE TABLE EXISTS ON EVERY REQUEST
+    ensure_table()
 
     conn = get_db()
     cur = conn.cursor()
@@ -45,6 +41,7 @@ def home():
     cur.execute("SELECT * FROM users")
     users = cur.fetchall()
     conn.close()
+
     return render_template("index.html", users=users)
 
 @app.route("/delete/<int:id>")
